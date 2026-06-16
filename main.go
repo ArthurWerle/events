@@ -1,15 +1,14 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"log"
+	"events/api/rest"
+	"events/db"
+	"events/repository"
+	"events/service"
 	"net/http"
-	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 )
 
@@ -18,28 +17,10 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
-	connStr := os.Getenv("DATABASE_URL")
-	conn, err := pgx.Connect(context.Background(), connStr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close(context.Background())
+	conn := db.Connect()
+	eventRepository := repository.NewEventRepository(conn)
+	queueService := service.NewQueueService(eventRepository)
 
-	rows, err := conn.Query(context.Background(), "SELECT id, payload, status FROM events")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id int
-		var payload, status string
-		rows.Scan(&id, &payload, &status)
-		fmt.Println(id, payload, status)
-	}
-
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("welcome"))
-	})
-	http.ListenAndServe(":3000", r)
+	mountedRoutes := rest.MountRoutes(r, queueService)
+	http.ListenAndServe(":3000", mountedRoutes)
 }

@@ -17,8 +17,8 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
-	conn := db.Connect()
-	eventRepository := repository.NewEventRepository(conn)
+	pool := db.Initialize()
+	eventRepository := repository.NewEventRepository(pool)
 	queueService := service.NewQueueService(eventRepository)
 
 	mountedRoutes := rest.MountRoutes(r, queueService)

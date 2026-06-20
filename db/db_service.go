@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -27,11 +28,15 @@ func connect() *pgxpool.Pool {
 }
 
 func runMigrations() {
+	dbURL := os.Getenv("DATABASE_URL")
+	// Convert postgres:// scheme to postgresql:// for lib/pq driver
+	migrationURL := strings.Replace(dbURL, "postgres://", "postgresql://", 1)
+	log.Printf("Migration DATABASE_URL: %s", migrationURL)
 	m, err := migrate.New(
 		"file://db/migrations",
-		os.Getenv("DATABASE_URL"))
+		migrationURL)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to open database: %v", err)
 	}
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		log.Fatal(err)

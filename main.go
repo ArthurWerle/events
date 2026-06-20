@@ -5,6 +5,7 @@ import (
 	"events/db"
 	"events/repository"
 	"events/service"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -22,5 +23,9 @@ func main() {
 	queueService := service.NewQueueService(eventRepository)
 
 	mountedRoutes := rest.MountRoutes(r, queueService)
-	http.ListenAndServe(":3000", mountedRoutes)
+
+	log.Println("Server starting on :3000")
+	if err := http.ListenAndServe(":3000", mountedRoutes); err != nil {
+		log.Fatalf("Server failed to start: %v", err)
+	}
 }

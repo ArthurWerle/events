@@ -11,7 +11,7 @@ import (
 )
 
 func MountRoutes(r *chi.Mux, queueService types.Queue) (mountedRouter *chi.Mux) {
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/api", func(w http.ResponseWriter, r *http.Request) {
 		statusStr := r.URL.Query().Get("status")
 
 		if statusStr != "" && !model.Status(statusStr).IsValid() {
@@ -40,7 +40,7 @@ func MountRoutes(r *chi.Mux, queueService types.Queue) (mountedRouter *chi.Mux) 
 		w.Write(eventsJson)
 	})
 
-	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/api", func(w http.ResponseWriter, r *http.Request) {
 		var event model.Event
 
 		json.NewDecoder(r.Body).Decode(&event)

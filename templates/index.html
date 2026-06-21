@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-pending {
+            background: #ffeaa7;
+            color: #d63031;
+        }
+
+        .status-processing {
+            background: #74b9ff;
+            color: #0984e3;
+        }
+
+        .status-done {
+            background: #55efc4;
+            color: #00b894;
+        }
+
+        .status-failed {
+            background: #ff7675;
+            color: #d63031;
+        }
+
+        .payload-cell {
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-box {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .refresh-indicator {
+            width: 10px;
+            height: 10px;
+            background: #55efc4;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Event Manager</h1>
+
+        <div class="card">
+            <h2>Create New Event</h2>
+            <div id="createMessage" class="message"></div>
+            <form id="createForm">
+                <div class="form-group">
+                    <label for="payload">Event Payload</label>
+                    <textarea id="payload" name="payload" rows="6" placeholder='Enter event payload (e.g., JSON: {"key": "value"})'></textarea>
+                </div>
+                <button type="submit">Create Event</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Events</h2>
+
+            <div class="stats" id="stats">
+                <div class="stat-box">
+                    <div class="stat-number" id="statTotal">0</div>
+                    <div class="stat-label">Total Events</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="statPending">0</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="statProcessing">0</div>
+                    <div class="stat-label">Processing</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="statDone">0</div>
+                    <div class="stat-label">Done</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="statFailed">0</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-status="all">All</button>
+                    <button class="filter-btn" data-status="pending">Pending</button>
+                    <button class="filter-btn" data-status="processing">Processing</button>
+                    <button class="filter-btn" data-status="done">Done</button>
+                    <button class="filter-btn" data-status="failed">Failed</button>
+                </div>
+                <div class="auto-refresh">
+                    <div class="refresh-indicator"></div>
+                    <span>Auto-refresh active</span>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="eventsTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Payload</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                        </tr>
+                    </thead>
+                    <tbody id="eventsBody">
+                        <tr>
+                            <td colspan="4" class="empty-state">
+                                <div>Loading events...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFilter = 'all';
+        let allEvents = [];
+
+        // Create event form submission
+        document.getElementById('createForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const payload = document.getElementById('payload').value.trim();
+            if (!payload) {
+                showMessage('createMessage', 'Please enter a payload', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ payload: payload })
+                });
+
+                if (response.ok) {
+                    const event = await response.json();
+                    showMessage('createMessage', `Event created successfully with ID: ${event.id}`, 'success');
+                    document.getElementById('payload').value = '';
+                    loadEvents(); // Refresh the events list
+                } else {
+                    const error = await response.text();
+                    showMessage('createMessage', `Error: ${error}`, 'error');
+                }
+            } catch (error) {
+                showMessage('createMessage', `Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Filter button clicks
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.status;
+                renderEvents();
+            });
+        });
+
+        // Show message helper
+        function showMessage(elementId, text, type) {
+            const messageEl = document.getElementById(elementId);
+            messageEl.textContent = text;
+            messageEl.className = `message ${type} show`;
+            setTimeout(() => {
+                messageEl.classList.remove('show');
+            }, 5000);
+        }
+
+        // Load all events
+        async function loadEvents() {
+            try {
+                // Fetch all statuses to get complete data
+                const statuses = ['pending', 'processing', 'done', 'failed'];
+                const promises = statuses.map(status =>
+                    fetch(`/api?status=${status}`).then(r => r.json())
+                );
+
+                const results = await Promise.all(promises);
+                allEvents = results.flat();
+
+                // Sort by ID descending (newest first)
+                allEvents.sort((a, b) => b.id - a.id);
+
+                updateStats();
+                renderEvents();
+            } catch (error) {
+                console.error('Error loading events:', error);
+                document.getElementById('eventsBody').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="empty-state">
+                            <div>Error loading events: ${error.message}</div>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Update statistics
+        function updateStats() {
+            const stats = {
+                total: allEvents.length,
+                pending: allEvents.filter(e => e.status === 'pending').length,
+                processing: allEvents.filter(e => e.status === 'processing').length,
+                done: allEvents.filter(e => e.status === 'done').length,
+                failed: allEvents.filter(e => e.status === 'failed').length
+            };
+
+            document.getElementById('statTotal').textContent = stats.total;
+            document.getElementById('statPending').textContent = stats.pending;
+            document.getElementById('statProcessing').textContent = stats.processing;
+            document.getElementById('statDone').textContent = stats.done;
+            document.getElementById('statFailed').textContent = stats.failed;
+        }
+
+        // Render events table
+        function renderEvents() {
+            const filteredEvents = currentFilter === 'all'
+                ? allEvents
+                : allEvents.filter(e => e.status === currentFilter);
+
+            const tbody = document.getElementById('eventsBody');
+
+            if (filteredEvents.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="empty-state">
+                            <div>No ${currentFilter === 'all' ? '' : currentFilter} events found</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filteredEvents.map(event => `
+                <tr>
+                    <td>${event.id}</td>
+                    <td class="payload-cell" title="${escapeHtml(event.payload)}">${escapeHtml(event.payload)}</td>
+                    <td><span class="status-badge status-${event.status}">${event.status}</span></td>
+                    <td>${formatDate(event.created_at)}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Auto-refresh every 3 seconds
+        setInterval(loadEvents, 3000);
+
+        // Initial load
+        loadEvents();
+    </script>
+</body>
+</html>

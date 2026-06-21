@@ -12,6 +12,7 @@ type EventRepository interface {
 	Create(event *model.Event) (model.Event, error)
 	FindByID(id uint) (model.Event, error)
 	FindAll(status *model.Status) ([]model.Event, error)
+	GetProcessable() ([]model.Event, error)
 	Update(event *model.Event) (model.Event, error)
 }
 
@@ -80,6 +81,37 @@ func (r *eventRepository) FindAll(status *model.Status) ([]model.Event, error) {
 	query := "SELECT id, payload, status FROM events WHERE status = $1"
 
 	rows, err := r.pool.Query(context.Background(), query, *status)
+	if err != nil {
+		log.Fatal(err)
+		return nil, err
+	}
+
+	events := []model.Event{}
+
+	for rows.Next() {
+		var id uint
+		var payload string
+		var status model.Status
+		rows.Scan(&id, &payload, &status)
+
+		event := model.Event{
+			ID:      id,
+			Payload: payload,
+			Status:  status,
+		}
+
+		events = append(events, event)
+	}
+
+	defer rows.Close()
+
+	return events, nil
+}
+
+func (r *eventRepository) GetProcessable() ([]model.Event, error) {
+	query := "SELECT id, payload FROM events WHERE status = 'pending' ORDER BY id ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
+
+	rows, err := r.pool.Query(context.Background(), query)
 	if err != nil {
 		log.Fatal(err)
 		return nil, err

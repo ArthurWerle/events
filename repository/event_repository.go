@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"events/model"
-	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -12,7 +11,7 @@ type EventRepository interface {
 	Create(event *model.Event) (model.Event, error)
 	FindByID(id uint) (model.Event, error)
 	FindAll(status *model.Status) ([]model.Event, error)
-	GetProcessable() ([]model.Event, error)
+	GetProcessable() (*model.Event, error)
 	Update(event *model.Event) (model.Event, error)
 }
 
@@ -25,144 +24,74 @@ func NewEventRepository(pool *pgxpool.Pool) EventRepository {
 }
 
 func (r *eventRepository) Create(event *model.Event) (model.Event, error) {
-	query := "INSERT INTO events (payload, status) VALUES ($1, $2) RETURNING id, payload, status"
+	query := `INSERT INTO events (payload, status, job_type, callback_url)
+	          VALUES ($1, $2, $3, $4)
+	          RETURNING id, payload, status, job_type, callback_url`
 
-	newEvent := model.Event{}
-	row := r.pool.QueryRow(context.Background(), query, event.Payload, model.STATUS_PENDING)
-
-	var id uint
-	var payload string
-	var status model.Status
-	err := row.Scan(&id, &payload, &status)
-
+	var e model.Event
+	row := r.pool.QueryRow(context.Background(), query,
+		event.Payload, model.STATUS_PENDING, event.JobType, event.CallbackURL)
+	err := row.Scan(&e.ID, &e.Payload, &e.Status, &e.JobType, &e.CallbackURL)
 	if err != nil {
-		log.Fatal(err)
-		return newEvent, err
+		return model.Event{}, err
 	}
-
-	newEvent = model.Event{
-		ID:      id,
-		Payload: payload,
-		Status:  status,
-	}
-
-	return newEvent, nil
+	return e, nil
 }
 
 func (r *eventRepository) FindByID(id uint) (model.Event, error) {
-	query := "SELECT * FROM events WHERE id = $1"
+	query := `SELECT id, payload, status, job_type, callback_url, created_at FROM events WHERE id = $1`
 
-	newEvent := model.Event{}
-	rows, err := r.pool.Query(context.Background(), query, id)
+	var e model.Event
+	row := r.pool.QueryRow(context.Background(), query, id)
+	err := row.Scan(&e.ID, &e.Payload, &e.Status, &e.JobType, &e.CallbackURL, &e.CreatedAt)
 	if err != nil {
-		log.Fatal(err)
-		return newEvent, err
+		return model.Event{}, err
 	}
-
-	for rows.Next() {
-		var id uint
-		var payload string
-		var status model.Status
-		rows.Scan(&id, &payload, &status)
-
-		newEvent = model.Event{
-			ID:      id,
-			Payload: payload,
-			Status:  status,
-		}
-	}
-
-	defer rows.Close()
-
-	return newEvent, nil
+	return e, nil
 }
 
 func (r *eventRepository) FindAll(status *model.Status) ([]model.Event, error) {
-	query := "SELECT id, payload, status FROM events WHERE status = $1"
+	query := `SELECT id, payload, status, job_type, callback_url, created_at FROM events WHERE status = $1`
 
 	rows, err := r.pool.Query(context.Background(), query, *status)
 	if err != nil {
-		log.Fatal(err)
 		return nil, err
 	}
-
-	events := []model.Event{}
-
-	for rows.Next() {
-		var id uint
-		var payload string
-		var status model.Status
-		rows.Scan(&id, &payload, &status)
-
-		event := model.Event{
-			ID:      id,
-			Payload: payload,
-			Status:  status,
-		}
-
-		events = append(events, event)
-	}
-
 	defer rows.Close()
 
+	var events []model.Event
+	for rows.Next() {
+		var e model.Event
+		if err := rows.Scan(&e.ID, &e.Payload, &e.Status, &e.JobType, &e.CallbackURL, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
 	return events, nil
 }
 
-func (r *eventRepository) GetProcessable() ([]model.Event, error) {
-	query := "SELECT id, payload FROM events WHERE status = 'pending' ORDER BY id ASC LIMIT 1 FOR UPDATE SKIP LOCKED"
+func (r *eventRepository) GetProcessable() (*model.Event, error) {
+	query := `SELECT id, payload, job_type, callback_url
+	          FROM events
+	          WHERE status = 'pending'
+	          ORDER BY id ASC
+	          LIMIT 1
+	          FOR UPDATE SKIP LOCKED`
 
-	rows, err := r.pool.Query(context.Background(), query)
+	var e model.Event
+	row := r.pool.QueryRow(context.Background(), query)
+	err := row.Scan(&e.ID, &e.Payload, &e.JobType, &e.CallbackURL)
 	if err != nil {
-		log.Fatal(err)
 		return nil, err
 	}
-
-	events := []model.Event{}
-
-	for rows.Next() {
-		var id uint
-		var payload string
-		var status model.Status
-		rows.Scan(&id, &payload, &status)
-
-		event := model.Event{
-			ID:      id,
-			Payload: payload,
-			Status:  status,
-		}
-
-		events = append(events, event)
-	}
-
-	defer rows.Close()
-
-	return events, nil
+	return &e, nil
 }
 
 func (r *eventRepository) Update(event *model.Event) (model.Event, error) {
-	query := "UPDATE events SET payload = $1, status = $2 WHERE id = $3"
-
-	newEvent := model.Event{}
-	rows, err := r.pool.Query(context.Background(), query, event.Payload, model.STATUS_PENDING, event.ID)
+	query := `UPDATE events SET payload = $1, status = $2 WHERE id = $3`
+	_, err := r.pool.Exec(context.Background(), query, event.Payload, event.Status, event.ID)
 	if err != nil {
-		log.Fatal(err)
-		return newEvent, err
+		return model.Event{}, err
 	}
-
-	for rows.Next() {
-		var id uint
-		var payload string
-		var status model.Status
-		rows.Scan(&id, &payload, &status)
-
-		newEvent = model.Event{
-			ID:      id,
-			Payload: payload,
-			Status:  status,
-		}
-	}
-
-	defer rows.Close()
-
-	return newEvent, nil
+	return *event, nil
 }

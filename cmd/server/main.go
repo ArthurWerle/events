@@ -1,13 +1,16 @@
 package main
 
 import (
-	"context"
+	"events/api/rest"
+	"events/db"
+	"events/repository"
+	"events/service"
 	"log"
+	"net/http"
 	"os"
-	"time"
 
-	events "events"
-
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
 )
 
@@ -19,28 +22,25 @@ func main() {
 		log.Fatal("DATABASE_URL environment variable is required")
 	}
 
-	p, err := events.New(events.Config{
-		DatabaseURL:     dbURL,
-		MaxRetries:      3,
-		PollInterval:    5 * time.Second,
-		EnableDashboard: true,
-		DashboardPort:   3000,
-	})
+	pool, err := db.InitializeWithURL(dbURL)
 	if err != nil {
-		log.Fatalf("failed to create job processor: %v", err)
+		log.Fatalf("failed to initialize database: %v", err)
 	}
 
-	ctx := context.Background()
-	p.Start(ctx)
+	eventRepo := repository.NewEventRepository(pool)
+	execRepo := repository.NewExecutionRepository(pool)
+	queueSvc := service.NewQueueService(eventRepo)
+	procSvc := service.NewProcessorService(eventRepo, execRepo, service.ProcessorConfig{})
 
-	// Example: enqueue a job at startup (remove in production)
-	event, err := p.Enqueue("example_job", `{"hello":"world"}`, "http://localhost:9000/callback")
-	if err != nil {
-		log.Printf("enqueue error: %v", err)
-	} else {
-		log.Printf("enqueued job id=%d", event.ID)
+	go procSvc.Consume()
+
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+	rest.MountRoutes(r, queueSvc, execRepo)
+	r.Get("/", rest.ServeUI)
+
+	log.Println("events service listening on :3000")
+	if err := http.ListenAndServe(":3000", r); err != nil {
+		log.Fatalf("server error: %v", err)
 	}
-
-	// Block forever
-	select {}
 }

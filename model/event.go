@@ -23,8 +23,10 @@ func (s Status) IsValid() bool {
 }
 
 type Event struct {
-	ID        uint      `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	Payload   string    `json:"payload"`
-	Status    Status    `json:"status"`
+	ID          uint      `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	Payload     string    `json:"payload"`
+	Status      Status    `json:"status"`
+	JobType     string    `json:"job_type"`
+	CallbackURL string    `json:"callback_url"`
 }

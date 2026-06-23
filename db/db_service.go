@@ -12,33 +12,40 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Initialize reads DATABASE_URL from the environment, runs migrations, and returns a pool.
 func Initialize() *pgxpool.Pool {
-	runMigrations()
-	return connect()
-}
-
-func connect() *pgxpool.Pool {
-	connStr := os.Getenv("DATABASE_URL")
-	pool, err := pgxpool.New(context.Background(), connStr)
+	pool, err := InitializeWithURL(os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	return pool
 }
 
-func runMigrations() {
-	dbURL := os.Getenv("DATABASE_URL")
-	// Convert postgres:// scheme to postgresql:// for lib/pq driver
-	migrationURL := strings.Replace(dbURL, "postgres://", "postgresql://", 1)
-	log.Printf("Migration DATABASE_URL: %s", migrationURL)
-	m, err := migrate.New(
-		"file://db/migrations",
-		migrationURL)
+// InitializeWithURL runs migrations for the given URL and returns a connection pool.
+func InitializeWithURL(databaseURL string) (*pgxpool.Pool, error) {
+	if err := runMigrations(databaseURL); err != nil {
+		return nil, err
+	}
+	return connect(databaseURL)
+}
+
+func connect(connStr string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(context.Background(), connStr)
 	if err != nil {
-		log.Fatalf("failed to open database: %v", err)
+		return nil, err
+	}
+	return pool, nil
+}
+
+func runMigrations(dbURL string) error {
+	migrationURL := strings.Replace(dbURL, "postgres://", "postgresql://", 1)
+	log.Printf("running migrations against %s", migrationURL)
+	m, err := migrate.New("file://db/migrations", migrationURL)
+	if err != nil {
+		return err
 	}
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }

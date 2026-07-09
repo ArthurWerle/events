@@ -1,4 +1,4 @@
-module events
+module github.com/ArthurWerle/events
 
 go 1.25.0
 

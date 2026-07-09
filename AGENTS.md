@@ -14,7 +14,7 @@ Go packages** (notably `client` for producers).
 
 ## Tech stack
 
-- **Go 1.25** (module name: `events`, see `go.mod`)
+- **Go 1.25** (module name: `github.com/ArthurWerle/events`, see `go.mod`)
 - **chi/v5** — HTTP router (`github.com/go-chi/chi/v5`)
 - **pgx/v5** — PostgreSQL driver / pool (`github.com/jackc/pgx/v5`)
 - **golang-migrate/v4** — schema migrations, run on startup
@@ -97,9 +97,9 @@ go vet ./...             # static checks
 - The processor handles **one job per poll cycle**, then sleeps `PollInterval`.
 - A non-`2xx` response or any transport error triggers a retry; backoff doubles
   each attempt starting at 2s.
-- **Module name is `events`** (not a fully-qualified path), so the Go packages
-  are importable in-repo but not `go get`-able from other modules as-is. Prefer
-  the REST API for cross-service use.
+- **Module name is `github.com/ArthurWerle/events`** (matches the GitHub repo),
+  so the Go packages — notably `client` — are `go get`-able from other modules.
+  The REST API remains available for non-Go consumers.
 - **No tests, no linter config, and no CI** exist in the repo yet. If you add
   behavior, consider adding `*_test.go` coverage; there is currently no baseline.
 

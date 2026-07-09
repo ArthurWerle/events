@@ -1,3 +1,9 @@
+# Staging stack. Structurally identical to docker-compose.yml; the distinct
+# top-level project name plus a staging stack.env (different SERVICE_CONTAINER_NAME,
+# SERVICE_PORT, POSTGRES_CONTAINER_NAME, POSTGRES_PORT) let it run side by side
+# with prod in Portainer without name/port collisions.
+name: events-staging
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -29,7 +35,6 @@ services:
     env_file:
       - stack.env
     environment:
-      # The service reads only DATABASE_URL; build it from the postgres creds.
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_CONTAINER_NAME}:5432/${POSTGRES_DB}?sslmode=disable
     ports:
       - "${SERVICE_PORT}:3000"
@@ -47,7 +52,5 @@ volumes:
 networks:
   events-network:
     driver: bridge
-  # Shared external network that transactions / ai-internal / mcp-api join, so
-  # reports can reach the events callback endpoint by container name.
   financer-transactions_transactions-network:
     external: true

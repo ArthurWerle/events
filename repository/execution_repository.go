@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	"events/model"
+	"github.com/ArthurWerle/events/model"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

@@ -51,15 +51,18 @@ startup.
 
 ### Environment variables
 
-| Variable                  | Used by        | Description                                  |
-| ------------------------- | -------------- | -------------------------------------------- |
-| `DATABASE_URL`            | the service    | Postgres connection string (**required**)    |
-| `POSTGRES_USER`           | docker-compose | Postgres username                            |
-| `POSTGRES_PASSWORD`       | docker-compose | Postgres password                            |
-| `POSTGRES_DB`             | docker-compose | Postgres database name                       |
-| `POSTGRES_CONTAINER_NAME` | docker-compose | Container name for the Postgres service      |
+| Variable                  | Used by        | Description                                     |
+| ------------------------- | -------------- | ----------------------------------------------- |
+| `DATABASE_URL`            | the service    | Postgres connection string (**required**)       |
+| `POSTGRES_USER`           | docker-compose | Postgres username                               |
+| `POSTGRES_PASSWORD`       | docker-compose | Postgres password                               |
+| `POSTGRES_DB`             | docker-compose | Postgres database name                          |
+| `POSTGRES_CONTAINER_NAME` | docker-compose | Container name for the Postgres service         |
+| `POSTGRES_PORT`           | docker-compose | Host port mapped to Postgres 5432               |
+| `SERVICE_CONTAINER_NAME`  | docker-compose | Container name for the events service           |
+| `SERVICE_PORT`            | docker-compose | Host port mapped to the events container `:3000`|
 
-A local `.env` is loaded automatically. Example:
+A local `.env` is loaded automatically by the service. Example:
 
 ```dotenv
 DATABASE_URL=postgres://events:events@localhost:5432/events?sslmode=disable
@@ -68,6 +71,44 @@ POSTGRES_PASSWORD=events
 POSTGRES_DB=events
 POSTGRES_CONTAINER_NAME=events-postgres
 ```
+
+## Deployment (Docker + Portainer)
+
+The provided `Dockerfile` builds a static binary and copies `db/migrations/`
+and `templates/` next to it (both are read at runtime relative to the working
+directory), so the image is self-contained. `docker-compose.yml` (prod) and
+`docker-compose.staging.yml` (staging) run Postgres + the events service and
+are driven entirely by a gitignored `stack.env` so the two stacks coexist in
+Portainer. Both join the shared external network
+`financer-transactions_transactions-network` so sibling services (e.g. reports)
+can reach the callback endpoint by container name.
+
+Example prod `stack.env`:
+
+```dotenv
+POSTGRES_USER=events
+POSTGRES_PASSWORD=change-me
+POSTGRES_DB=events
+POSTGRES_CONTAINER_NAME=events-postgres
+POSTGRES_PORT=5432
+SERVICE_CONTAINER_NAME=events
+SERVICE_PORT=3000
+```
+
+Staging `stack.env` uses distinct names/ports, e.g.
+`SERVICE_CONTAINER_NAME=events-staging`, `SERVICE_PORT=3001`,
+`POSTGRES_CONTAINER_NAME=events-staging-postgres`, `POSTGRES_PORT=5433`.
+
+```bash
+# prod
+docker compose --env-file stack.env up -d --build
+# staging
+docker compose -f docker-compose.staging.yml --env-file stack.env up -d --build
+```
+
+In Portainer, create two stacks — one per compose file — each with its own
+`stack.env` values (the staging `SERVICE_CONTAINER_NAME` / `SERVICE_PORT` must
+differ from prod to avoid `container name already in use` / port conflicts).
 
 ## Using it from another service
 
@@ -128,7 +169,7 @@ package main
 import (
     "log"
 
-    "events/client"
+    "github.com/ArthurWerle/events/client"
 )
 
 func main() {
@@ -147,12 +188,11 @@ func main() {
 }
 ```
 
-> **Importing the Go client from another module:** this module is currently
-> named `events` (see `go.mod`), so `import "events/client"` resolves only
-> within this repository. For cross-service integration, the **REST API above is
-> the primary, language-agnostic path**. To `go get` the client from another
-> module, the module path would need to match its repository
-> (e.g. `github.com/ArthurWerle/events`).
+> **Importing the Go client from another module:** this module is named
+> `github.com/ArthurWerle/events` (see `go.mod`), matching its GitHub
+> repository, so other Go modules can `go get github.com/ArthurWerle/events`
+> and `import "github.com/ArthurWerle/events/client"` directly. The **REST API
+> above remains the language-agnostic path** for non-Go consumers.
 
 ## Querying status
 

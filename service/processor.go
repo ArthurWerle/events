@@ -1,9 +1,9 @@
 package service
 
 import (
-	"events/model"
-	"events/repository"
 	"fmt"
+	"github.com/ArthurWerle/events/model"
+	"github.com/ArthurWerle/events/repository"
 	"log"
 	"net/http"
 	"net/url"

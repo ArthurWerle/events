@@ -2,10 +2,10 @@ package rest
 
 import (
 	"encoding/json"
-	"events/model"
-	"events/repository"
-	"events/types"
 	"fmt"
+	"github.com/ArthurWerle/events/model"
+	"github.com/ArthurWerle/events/repository"
+	"github.com/ArthurWerle/events/types"
 	"net/http"
 	"strconv"
 

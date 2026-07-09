@@ -1,10 +1,10 @@
 package main
 
 import (
-	"events/api/rest"
-	"events/db"
-	"events/repository"
-	"events/service"
+	"github.com/ArthurWerle/events/api/rest"
+	"github.com/ArthurWerle/events/db"
+	"github.com/ArthurWerle/events/repository"
+	"github.com/ArthurWerle/events/service"
 	"log"
 	"net/http"
 	"os"

@@ -1,7 +1,7 @@
 package types
 
 import (
-	"events/model"
+	"github.com/ArthurWerle/events/model"
 )
 
 type Queue interface {

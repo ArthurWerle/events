@@ -1,9 +1,9 @@
 package service
 
 import (
-	"events/model"
-	"events/repository"
-	"events/types"
+	"github.com/ArthurWerle/events/model"
+	"github.com/ArthurWerle/events/repository"
+	"github.com/ArthurWerle/events/types"
 )
 
 type queueService struct {

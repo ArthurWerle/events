@@ -85,7 +85,7 @@ func MountRoutes(r *chi.Mux, queueService types.Queue, executionRepo repository.
 
 	// Keep backward-compatible /api route pointing to events
 	r.Get("/api", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/api/events?"+r.URL.RawQuery, http.StatusMovedPermanently)
+		http.Redirect(w, r, "/api/events?"+r.URL.RawQuery, http.StatusTemporaryRedirect)
 	})
 
 	return r

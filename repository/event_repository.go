@@ -59,7 +59,7 @@ func (r *eventRepository) FindAll(status *model.Status) ([]model.Event, error) {
 	}
 	defer rows.Close()
 
-	var events []model.Event
+	events := []model.Event{} // non-nil so an empty result encodes as [] not null
 	for rows.Next() {
 		var e model.Event
 		if err := rows.Scan(&e.ID, &e.Payload, &e.Status, &e.JobType, &e.CallbackURL, &e.CreatedAt); err != nil {
@@ -88,7 +88,7 @@ func (r *eventRepository) GetProcessable() (*model.Event, error) {
 }
 
 func (r *eventRepository) Update(event *model.Event) (model.Event, error) {
-	query := `UPDATE events SET payload = $1, status = $2 WHERE id = $3`
+	query := `UPDATE events SET payload = $1, status = $2, updated_at = now() WHERE id = $3`
 	_, err := r.pool.Exec(context.Background(), query, event.Payload, event.Status, event.ID)
 	if err != nil {
 		return model.Event{}, err

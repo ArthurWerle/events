@@ -58,6 +58,7 @@
             font-weight: 600;
         }
 
+        input[type="text"],
         textarea {
             width: 100%;
             padding: 12px;
@@ -69,6 +70,7 @@
             transition: border-color 0.3s;
         }
 
+        input[type="text"]:focus,
         textarea:focus {
             outline: none;
             border-color: #667eea;
@@ -274,6 +276,14 @@
             <div id="createMessage" class="message"></div>
             <form id="createForm">
                 <div class="form-group">
+                    <label for="jobType">Job Type</label>
+                    <input type="text" id="jobType" name="jobType" placeholder="e.g., generate-report">
+                </div>
+                <div class="form-group">
+                    <label for="callbackUrl">Callback URL</label>
+                    <input type="text" id="callbackUrl" name="callbackUrl" placeholder="e.g., http://reports:8080/api/v1/jobs/generate">
+                </div>
+                <div class="form-group">
                     <label for="payload">Event Payload</label>
                     <textarea id="payload" name="payload" rows="6" placeholder='Enter event payload (e.g., JSON: {"key": "value"})'></textarea>
                 </div>
@@ -352,18 +362,24 @@
             e.preventDefault();
 
             const payload = document.getElementById('payload').value.trim();
+            const jobType = document.getElementById('jobType').value.trim();
+            const callbackUrl = document.getElementById('callbackUrl').value.trim();
             if (!payload) {
                 showMessage('createMessage', 'Please enter a payload', 'error');
                 return;
             }
+            if (!jobType || !callbackUrl) {
+                showMessage('createMessage', 'Please enter a job type and callback URL', 'error');
+                return;
+            }
 
             try {
-                const response = await fetch('/api', {
+                const response = await fetch('/api/events', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ payload: payload })
+                    body: JSON.stringify({ job_type: jobType, payload: payload, callback_url: callbackUrl })
                 });
 
                 if (response.ok) {
@@ -406,11 +422,16 @@
                 // Fetch all statuses to get complete data
                 const statuses = ['pending', 'processing', 'done', 'failed'];
                 const promises = statuses.map(status =>
-                    fetch(`/api?status=${status}`).then(r => r.json())
+                    fetch(`/api/events?status=${status}`).then(r => r.ok ? r.json() : [])
                 );
 
                 const results = await Promise.all(promises);
-                allEvents = results.flat();
+                // Guard against null/malformed responses so one bad status
+                // doesn't break the whole page.
+                allEvents = results
+                    .filter(Array.isArray)
+                    .flat()
+                    .filter(e => e && typeof e.id === 'number');
 
                 // Sort by ID descending (newest first)
                 allEvents.sort((a, b) => b.id - a.id);

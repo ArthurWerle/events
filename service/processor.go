@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"github.com/ArthurWerle/events/model"
 	"github.com/ArthurWerle/events/repository"
@@ -8,13 +9,18 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 const (
 	defaultMaxRetries   = 3
 	defaultPollInterval = 5 * time.Second
-	defaultHTTPTimeout  = 10 * time.Second
-	initialBackoff      = 2 * time.Second
+	// Callbacks run the job synchronously (e.g. reports generates and emails
+	// the report inside the request), so allow well beyond the reports-side
+	// 90s pipeline timeout.
+	defaultHTTPTimeout = 120 * time.Second
+	initialBackoff     = 2 * time.Second
 )
 
 type ProcessorConfig struct {
@@ -60,7 +66,10 @@ func (s *ProcessorService) Consume() {
 func (s *ProcessorService) processNext() error {
 	event, err := s.eventRepository.GetProcessable()
 	if err != nil {
-		return nil // no rows available
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil // no rows available
+		}
+		return fmt.Errorf("failed to fetch processable event: %w", err)
 	}
 
 	event.Status = model.STATUS_PROCESSING

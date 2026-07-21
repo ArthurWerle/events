@@ -3,454 +3,657 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Manager</title>
+    <meta name="color-scheme" content="dark light">
+    <title>Events</title>
+
+    <!-- Set the theme before first paint to avoid a flash of the wrong theme. -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('events-theme')
+                if (t !== 'light') document.documentElement.classList.add('dark')
+            } catch (e) {
+                document.documentElement.classList.add('dark')
+            }
+        })()
+    </script>
+
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        @font-face {
+            font-family: 'Geist';
+            src: url('/static/fonts/GeistVF.woff') format('woff');
+            font-weight: 100 900;
+            font-display: swap;
         }
+        @font-face {
+            font-family: 'Geist Mono';
+            src: url('/static/fonts/GeistMonoVF.woff') format('woff');
+            font-weight: 100 900;
+            font-display: swap;
+        }
+
+        :root {
+            color-scheme: light;
+            --background: 0 0% 98%;
+            --foreground: 240 5.9% 10%;
+            --card: 0 0% 100%;
+            --card-foreground: 240 5.9% 10%;
+            --muted: 240 4.7% 95.9%;
+            --muted-foreground: 240 3.8% 46.1%;
+            --border: 240 5.9% 90%;
+            --radius: 0.625rem;
+
+            --panel2: #f4f4f5;
+            --border2: #d4d4d8;
+            --faint: #a1a1aa;
+            --green: #16a34a;
+            --green-bg: rgba(22, 163, 74, 0.1);
+            --red: #dc2626;
+            --red-bg: rgba(220, 38, 38, 0.08);
+
+            /* Status accents (Vercel-style): dot + tinted background */
+            --st-pending: #b45309;      --st-pending-dot: #f59e0b;  --st-pending-bg: rgba(245, 158, 11, 0.1);
+            --st-processing: #0068d6;   --st-processing-dot: #0070f3; --st-processing-bg: rgba(0, 112, 243, 0.1);
+            --st-done: #15803d;         --st-done-dot: #16a34a;     --st-done-bg: rgba(22, 163, 74, 0.1);
+            --st-failed: #b91c1c;       --st-failed-dot: #dc2626;   --st-failed-bg: rgba(220, 38, 38, 0.08);
+        }
+
+        .dark {
+            color-scheme: dark;
+            --background: 240 5% 4.1%;
+            --foreground: 240 4.7% 95.9%;
+            --card: 240 5.9% 6.7%;
+            --card-foreground: 240 4.7% 95.9%;
+            --muted: 240 5.9% 10%;
+            --muted-foreground: 240 4.8% 63.3%;
+            --border: 240 5.4% 14.5%;
+
+            --panel2: #18181b;
+            --border2: #33333a;
+            --faint: #606069;
+            --green: #4ade80;
+            --green-bg: rgba(74, 222, 128, 0.1);
+            --red: #f87171;
+            --red-bg: rgba(248, 113, 113, 0.08);
+
+            --st-pending: #fbbf24;      --st-pending-dot: #f59e0b;  --st-pending-bg: rgba(245, 158, 11, 0.12);
+            --st-processing: #52a8ff;   --st-processing-dot: #0070f3; --st-processing-bg: rgba(0, 112, 243, 0.15);
+            --st-done: #4ade80;         --st-done-dot: #4ade80;     --st-done-bg: rgba(74, 222, 128, 0.1);
+            --st-failed: #f87171;       --st-failed-dot: #f87171;   --st-failed-bg: rgba(248, 113, 113, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body { height: 100%; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            font-family: 'Geist', system-ui, -apple-system, sans-serif;
+            background: hsl(var(--background));
+            color: hsl(var(--foreground));
+            font-size: 14px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
         }
+
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border2);
+            border-radius: 5px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+
+        .mono { font-family: 'Geist Mono', ui-monospace, monospace; }
+
+        /* ---------- Shell ---------- */
+        .app { display: flex; height: 100vh; }
+
+        .sidebar {
+            width: 216px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid hsl(var(--border));
+            background: hsl(var(--card));
+            padding: 10px;
+        }
+
+        .main { flex: 1; overflow-y: auto; }
 
         .container {
-            max-width: 1200px;
+            max-width: 1120px;
             margin: 0 auto;
-        }
-
-        h1 {
-            color: white;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 25px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
-        .card h2 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 1.5em;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: 600;
-        }
-
-        input[type="text"],
-        textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            resize: vertical;
-            transition: border-color 0.3s;
-        }
-
-        input[type="text"]:focus,
-        textarea:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        .filter-buttons {
+            padding: 26px 32px 56px;
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+            flex-direction: column;
+            gap: 20px;
         }
 
-        .filter-btn {
-            padding: 8px 16px;
-            font-size: 14px;
-            background: #f5f5f5;
-            color: #333;
+        /* ---------- Brand ---------- */
+        .brand { display: flex; align-items: center; gap: 9px; padding: 6px; margin-bottom: 10px; }
+        .brand-mark {
+            width: 26px; height: 26px;
+            border-radius: 6px;
+            background: hsl(var(--foreground));
+            color: hsl(var(--background));
+            display: flex; align-items: center; justify-content: center;
+        }
+        .brand-mark svg { width: 15px; height: 15px; }
+        .wordmark { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+
+        /* ---------- Nav ---------- */
+        .nav { display: flex; flex-direction: column; gap: 2px; }
+        .nav-label {
+            font-size: 10.5px; font-weight: 500; text-transform: uppercase;
+            letter-spacing: .07em; color: var(--faint);
+            padding: 10px 9px 5px;
+        }
+        .nav-item {
+            display: flex; align-items: center; gap: 10px;
+            width: 100%; text-align: left;
+            border: none; background: none; cursor: pointer;
+            border-radius: 6px; padding: 7px 9px;
+            font: inherit; font-size: 13px; font-weight: 500;
+            color: hsl(var(--muted-foreground));
+            transition: color .15s, background .15s;
+        }
+        .nav-item:hover { color: hsl(var(--foreground)); }
+        .nav-item.active { background: var(--panel2); color: hsl(var(--foreground)); }
+        .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+        .nav-item .count { margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--faint); }
+        .nav-item.active .count { color: hsl(var(--muted-foreground)); }
+
+        .sidebar-footer {
+            margin-top: auto;
+            border-top: 1px solid hsl(var(--border));
+            padding-top: 8px;
+        }
+        .side-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 6px 4px 6px 9px;
+        }
+        .autorefresh {
+            display: flex; align-items: center; gap: 7px;
+            font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--faint);
+        }
+        .refresh-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+
+        /* ---------- Icon button ---------- */
+        .icon-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 5px; border-radius: 5px;
+            color: var(--faint); background: none; border: none; cursor: pointer;
+            transition: color .15s, background .15s;
+        }
+        .icon-btn:hover { color: hsl(var(--foreground)); background: var(--panel2); }
+        .icon-btn svg { width: 16px; height: 16px; }
+
+        /* ---------- Top bar (mobile) ---------- */
+        .topbar { display: none; }
+        .nav-overlay { display: none; }
+
+        /* ---------- Page header ---------- */
+        .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+        .page-title { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+        .page-subtitle { font-size: 13px; color: hsl(var(--muted-foreground)); margin-top: 3px; }
+
+        /* ---------- Buttons ---------- */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            height: 34px; padding: 0 13px;
+            border-radius: 7px; border: 1px solid transparent;
+            font: inherit; font-size: 12.5px; font-weight: 600;
+            cursor: pointer; white-space: nowrap;
+            transition: opacity .15s, background .15s, border-color .15s;
+        }
+        .btn svg { width: 15px; height: 15px; }
+        .btn-primary { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+        .btn-primary:hover { opacity: .9; }
+        .btn-outline { background: transparent; border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
+        .btn-outline:hover { border-color: var(--border2); }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+        /* ---------- Stat tiles ---------- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+            gap: 12px;
+        }
+        .stat-tile {
+            display: flex; flex-direction: column; gap: 9px;
+            border: 1px solid hsl(var(--border));
+            border-radius: 10px; background: hsl(var(--card));
+            padding: 15px 16px;
+        }
+        .stat-label {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 11px; font-weight: 500; text-transform: uppercase;
+            letter-spacing: .06em; color: hsl(var(--muted-foreground));
+        }
+        .stat-label .dot { width: 6px; height: 6px; border-radius: 50%; }
+        .stat-value { font-family: 'Geist Mono', monospace; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+
+        /* ---------- Card ---------- */
+        .card { border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card)); }
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 13px 16px; border-bottom: 1px solid hsl(var(--border));
+        }
+        .card-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+        .card-subtitle { font-size: 12px; color: var(--faint); font-family: 'Geist Mono', monospace; }
+
+        /* ---------- Table ---------- */
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+            text-align: left; white-space: nowrap;
+            font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .07em;
+            color: var(--faint);
+            padding: 10px 14px; border-bottom: 1px solid hsl(var(--border));
+        }
+        tbody td { padding: 11px 14px; border-bottom: 1px solid hsl(var(--border)); font-size: 13px; vertical-align: middle; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr.clickable { cursor: pointer; transition: background .12s; }
+        tbody tr.clickable:hover { background: var(--panel2); }
+        .cell-id { font-family: 'Geist Mono', monospace; font-size: 12.5px; color: hsl(var(--muted-foreground)); white-space: nowrap; }
+        .cell-jobtype { font-family: 'Geist Mono', monospace; font-size: 12px; white-space: nowrap; }
+        .cell-date { font-family: 'Geist Mono', monospace; font-size: 11.5px; color: hsl(var(--muted-foreground)); white-space: nowrap; }
+        .cell-truncate {
+            max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            font-family: 'Geist Mono', monospace; font-size: 12px;
         }
 
-        .filter-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .table-container {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th {
-            background: #f8f9fa;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            color: #333;
-            border-bottom: 2px solid #e0e0e0;
-        }
-
-        td {
-            padding: 12px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        tr:hover {
-            background: #f8f9fa;
-        }
-
+        /* ---------- Status badge (Vercel-style) ---------- */
         .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 2px 9px 2px 8px;
+            border-radius: 999px; border: 1px solid hsl(var(--border));
+            font-size: 11px; font-weight: 500; white-space: nowrap; text-transform: capitalize;
         }
+        .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+        .status-pending { color: var(--st-pending); background: var(--st-pending-bg); }
+        .status-pending .dot { background: var(--st-pending-dot); }
+        .status-processing { color: var(--st-processing); background: var(--st-processing-bg); }
+        .status-processing .dot { background: var(--st-processing-dot); }
+        .status-done { color: var(--st-done); background: var(--st-done-bg); }
+        .status-done .dot { background: var(--st-done-dot); }
+        .status-failed { color: var(--st-failed); background: var(--st-failed-bg); }
+        .status-failed .dot { background: var(--st-failed-dot); }
 
-        .status-pending {
-            background: #ffeaa7;
-            color: #d63031;
-        }
+        .code-ok { color: var(--green); }
+        .code-err { color: var(--red); }
+        .code-none { color: var(--faint); }
 
-        .status-processing {
-            background: #74b9ff;
-            color: #0984e3;
-        }
+        /* ---------- Empty / loading ---------- */
+        .empty-state { text-align: center; padding: 46px 20px; color: var(--faint); font-size: 13px; }
 
-        .status-done {
-            background: #55efc4;
-            color: #00b894;
+        /* ---------- Dialog ---------- */
+        .overlay {
+            position: fixed; inset: 0; z-index: 50;
+            background: rgba(0, 0, 0, .55);
+            display: none; align-items: center; justify-content: center;
+            padding: 16px;
         }
+        .overlay.open { display: flex; }
+        .dialog {
+            width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto;
+            background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+            border-radius: 12px; padding: 22px; position: relative;
+        }
+        .dialog-wide { max-width: 660px; }
+        .dialog-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+        .dialog-desc { font-size: 12.5px; color: hsl(var(--muted-foreground)); margin-top: 4px; }
+        .dialog-close { position: absolute; right: 14px; top: 14px; }
 
-        .status-failed {
-            background: #ff7675;
-            color: #d63031;
+        /* ---------- Form ---------- */
+        .form { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form label { font-size: 12px; font-weight: 500; color: hsl(var(--muted-foreground)); }
+        .input, .textarea {
+            width: 100%;
+            border: 1px solid hsl(var(--border)); border-radius: 7px;
+            background: hsl(var(--background)); color: hsl(var(--foreground));
+            font-family: 'Geist Mono', ui-monospace, monospace; font-size: 13px;
+            padding: 0 11px; height: 34px;
+            transition: border-color .15s;
         }
-
-        .payload-cell {
-            max-width: 400px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-        }
+        .textarea { height: auto; min-height: 112px; padding: 9px 11px; line-height: 1.55; resize: vertical; }
+        .input:focus, .textarea:focus { outline: none; border-color: var(--border2); }
+        .input::placeholder, .textarea::placeholder { color: var(--faint); }
 
         .message {
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            display: none;
+            display: none; padding: 9px 12px; border-radius: 7px;
+            font-size: 12.5px; border: 1px solid transparent; margin-top: 4px;
+        }
+        .message.show { display: block; }
+        .message.success { color: var(--green); background: var(--green-bg); border-color: var(--green-bg); }
+        .message.error { color: var(--red); background: var(--red-bg); border-color: var(--red-bg); }
+
+        .exec-meta {
+            display: flex; gap: 6px; align-items: center;
+            font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--faint);
         }
 
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; }
 
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .message.show {
-            display: block;
-        }
-
-        .stats {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .stat-box {
-            flex: 1;
-            min-width: 150px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 2em;
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .stat-label {
-            color: #666;
-            font-size: 0.9em;
-            margin-top: 5px;
-        }
-
-        .auto-refresh {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #666;
-            font-size: 14px;
-        }
-
-        .refresh-indicator {
-            width: 10px;
-            height: 10px;
-            background: #55efc4;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #999;
-        }
-
-        .empty-state svg {
-            width: 100px;
-            height: 100px;
-            margin-bottom: 20px;
-            opacity: 0.3;
+        /* ---------- Responsive ---------- */
+        @media (max-width: 768px) {
+            .topbar {
+                display: flex; align-items: center; gap: 10px;
+                padding: 10px 14px; border-bottom: 1px solid hsl(var(--border));
+                background: hsl(var(--card)); position: sticky; top: 0; z-index: 30;
+            }
+            .topbar .brand { margin: 0; padding: 0; }
+            .topbar .spacer { flex: 1; }
+            .sidebar {
+                position: fixed; top: 0; left: 0; height: 100%; z-index: 60;
+                transform: translateX(-100%); transition: transform .2s ease;
+                box-shadow: 4px 0 24px rgba(0, 0, 0, .25);
+            }
+            .sidebar.open { transform: translateX(0); }
+            .nav-overlay { position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, .55); }
+            .nav-overlay.open { display: block; }
+            .container { padding: 18px 16px 48px; }
+            .page-header { flex-direction: column; align-items: stretch; }
+            .form-row { grid-template-columns: 1fr; }
+            .app { height: auto; min-height: 100vh; flex-direction: column; }
+            .main { overflow-y: visible; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎯 Event Manager</h1>
-
-        <div class="card">
-            <h2>Create New Event</h2>
-            <div id="createMessage" class="message"></div>
-            <form id="createForm">
-                <div class="form-group">
-                    <label for="jobType">Job Type</label>
-                    <input type="text" id="jobType" name="jobType" placeholder="e.g., generate-report">
+    <div class="app">
+        <!-- Mobile top bar -->
+        <div class="topbar">
+            <button class="icon-btn" id="menuBtn" aria-label="Open menu">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <div class="brand">
+                <div class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                 </div>
-                <div class="form-group">
-                    <label for="callbackUrl">Callback URL</label>
-                    <input type="text" id="callbackUrl" name="callbackUrl" placeholder="e.g., http://reports:8080/api/v1/jobs/generate">
-                </div>
-                <div class="form-group">
-                    <label for="payload">Event Payload</label>
-                    <textarea id="payload" name="payload" rows="6" placeholder='Enter event payload (e.g., JSON: {"key": "value"})'></textarea>
-                </div>
-                <button type="submit">Create Event</button>
-            </form>
+                <span class="wordmark">Events</span>
+            </div>
+            <div class="spacer"></div>
+            <button class="icon-btn" data-theme-toggle aria-label="Toggle theme"><span data-theme-icon></span></button>
         </div>
 
-        <div class="card">
-            <h2>Events</h2>
+        <div class="nav-overlay" id="navOverlay"></div>
 
-            <div class="stats" id="stats">
-                <div class="stat-box">
-                    <div class="stat-number" id="statTotal">0</div>
-                    <div class="stat-label">Total Events</div>
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="brand">
+                <div class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                 </div>
-                <div class="stat-box">
-                    <div class="stat-number" id="statPending">0</div>
-                    <div class="stat-label">Pending</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-number" id="statProcessing">0</div>
-                    <div class="stat-label">Processing</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-number" id="statDone">0</div>
-                    <div class="stat-label">Done</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-number" id="statFailed">0</div>
-                    <div class="stat-label">Failed</div>
-                </div>
+                <span class="wordmark">Events</span>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <div class="filter-buttons">
-                    <button class="filter-btn active" data-status="all">All</button>
-                    <button class="filter-btn" data-status="pending">Pending</button>
-                    <button class="filter-btn" data-status="processing">Processing</button>
-                    <button class="filter-btn" data-status="done">Done</button>
-                    <button class="filter-btn" data-status="failed">Failed</button>
-                </div>
-                <div class="auto-refresh">
-                    <div class="refresh-indicator"></div>
-                    <span>Auto-refresh active</span>
-                </div>
-            </div>
+            <div class="nav-label">Queue</div>
+            <nav class="nav" id="filterNav">
+                <button class="nav-item active" data-status="all">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    <span>All events</span><span class="count" id="navCountAll">0</span>
+                </button>
+                <button class="nav-item" data-status="pending">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+                    <span>Pending</span><span class="count" id="navCountPending">0</span>
+                </button>
+                <button class="nav-item" data-status="processing">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                    <span>Processing</span><span class="count" id="navCountProcessing">0</span>
+                </button>
+                <button class="nav-item" data-status="done">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <span>Done</span><span class="count" id="navCountDone">0</span>
+                </button>
+                <button class="nav-item" data-status="failed">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    <span>Failed</span><span class="count" id="navCountFailed">0</span>
+                </button>
+            </nav>
 
-            <div class="table-container">
-                <table id="eventsTable">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Payload</th>
-                            <th>Status</th>
-                            <th>Created At</th>
-                        </tr>
-                    </thead>
-                    <tbody id="eventsBody">
-                        <tr>
-                            <td colspan="4" class="empty-state">
-                                <div>Loading events...</div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="sidebar-footer">
+                <div class="side-row">
+                    <div class="autorefresh"><span class="refresh-dot"></span> Auto-refresh</div>
+                    <button class="icon-btn" data-theme-toggle aria-label="Toggle theme"><span data-theme-icon></span></button>
+                </div>
             </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main">
+            <div class="container">
+                <div class="page-header">
+                    <div>
+                        <div class="page-title">Events</div>
+                        <div class="page-subtitle">Job &amp; delivery queue</div>
+                    </div>
+                    <div>
+                        <button class="btn btn-primary" id="newEventBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                            New event
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-tile">
+                        <div class="stat-label">Total events</div>
+                        <div class="stat-value" id="statTotal">0</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="stat-label"><span class="dot" style="background: var(--st-pending-dot)"></span> Pending</div>
+                        <div class="stat-value" id="statPending">0</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="stat-label"><span class="dot" style="background: var(--st-processing-dot)"></span> Processing</div>
+                        <div class="stat-value" id="statProcessing">0</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="stat-label"><span class="dot" style="background: var(--st-done-dot)"></span> Done</div>
+                        <div class="stat-value" id="statDone">0</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="stat-label"><span class="dot" style="background: var(--st-failed-dot)"></span> Failed</div>
+                        <div class="stat-value" id="statFailed">0</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title" id="eventsTitle">All events</div>
+                        <div class="card-subtitle">click a row for delivery history</div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Status</th>
+                                    <th>Job Type</th>
+                                    <th>Payload</th>
+                                    <th>Callback URL</th>
+                                    <th>Created At</th>
+                                </tr>
+                            </thead>
+                            <tbody id="eventsBody">
+                                <tr><td colspan="6" class="empty-state">Loading events…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create event dialog -->
+    <div class="overlay" id="createOverlay">
+        <div class="dialog">
+            <button class="icon-btn dialog-close" data-close="createOverlay" aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+            </button>
+            <div class="dialog-title">New event</div>
+            <div class="dialog-desc">Enqueue a job to be delivered to a callback URL.</div>
+            <form class="form" id="createForm">
+                <div id="createMessage" class="message"></div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="jobType">Job Type</label>
+                        <input class="input" type="text" id="jobType" name="jobType" placeholder="generate-report">
+                    </div>
+                    <div class="form-group">
+                        <label for="callbackUrl">Callback URL</label>
+                        <input class="input" type="text" id="callbackUrl" name="callbackUrl" placeholder="http://reports:8080/api/v1/jobs">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="payload">Payload</label>
+                    <textarea class="textarea" id="payload" name="payload" rows="6" placeholder='{"key": "value"}'></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" id="createSubmit">Create event</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delivery history (drill-down) dialog -->
+    <div class="overlay" id="execOverlay">
+        <div class="dialog dialog-wide">
+            <button class="icon-btn dialog-close" data-close="execOverlay" aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+            </button>
+            <div class="dialog-title">Delivery history</div>
+            <div class="dialog-desc">Attempts to deliver event <span class="exec-meta" style="display:inline-flex"><span id="execEventId">#0</span></span></div>
+            <div id="execBody" style="margin-top: 16px;"></div>
         </div>
     </div>
 
     <script>
-        let currentFilter = 'all';
-        let allEvents = [];
+        let currentFilter = 'all'
+        let allEvents = []
 
-        // Create event form submission
+        const SUN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>'
+        const MOON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>'
+
+        // ---------- Theme ----------
+        function syncThemeIcon() {
+            const isDark = document.documentElement.classList.contains('dark')
+            const icon = isDark ? SUN_SVG : MOON_SVG
+            document.querySelectorAll('[data-theme-icon]').forEach(el => { el.innerHTML = icon })
+        }
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark')
+            try { localStorage.setItem('events-theme', isDark ? 'dark' : 'light') } catch (e) {}
+            syncThemeIcon()
+        }
+        document.querySelectorAll('[data-theme-toggle]').forEach(btn => btn.addEventListener('click', toggleTheme))
+        syncThemeIcon()
+
+        // ---------- Mobile nav ----------
+        const sidebar = document.getElementById('sidebar')
+        const navOverlay = document.getElementById('navOverlay')
+        function openNav() { sidebar.classList.add('open'); navOverlay.classList.add('open') }
+        function closeNav() { sidebar.classList.remove('open'); navOverlay.classList.remove('open') }
+        document.getElementById('menuBtn').addEventListener('click', openNav)
+        navOverlay.addEventListener('click', closeNav)
+
+        // ---------- Dialogs ----------
+        function openDialog(id) { document.getElementById(id).classList.add('open') }
+        function closeDialog(id) { document.getElementById(id).classList.remove('open') }
+        document.querySelectorAll('[data-close]').forEach(btn =>
+            btn.addEventListener('click', () => closeDialog(btn.dataset.close)))
+        document.querySelectorAll('.overlay').forEach(ov =>
+            ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open') }))
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') document.querySelectorAll('.overlay.open').forEach(ov => ov.classList.remove('open'))
+        })
+        document.getElementById('newEventBtn').addEventListener('click', () => openDialog('createOverlay'))
+
+        // ---------- Create event ----------
         document.getElementById('createForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+            e.preventDefault()
+            const payload = document.getElementById('payload').value.trim()
+            const jobType = document.getElementById('jobType').value.trim()
+            const callbackUrl = document.getElementById('callbackUrl').value.trim()
 
-            const payload = document.getElementById('payload').value.trim();
-            const jobType = document.getElementById('jobType').value.trim();
-            const callbackUrl = document.getElementById('callbackUrl').value.trim();
-            if (!payload) {
-                showMessage('createMessage', 'Please enter a payload', 'error');
-                return;
-            }
-            if (!jobType || !callbackUrl) {
-                showMessage('createMessage', 'Please enter a job type and callback URL', 'error');
-                return;
-            }
+            if (!payload) { showMessage('createMessage', 'Please enter a payload', 'error'); return }
+            if (!jobType || !callbackUrl) { showMessage('createMessage', 'Please enter a job type and callback URL', 'error'); return }
 
+            const submit = document.getElementById('createSubmit')
+            submit.disabled = true
             try {
                 const response = await fetch('/api/events', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ job_type: jobType, payload: payload, callback_url: callbackUrl })
-                });
-
+                })
                 if (response.ok) {
-                    const event = await response.json();
-                    showMessage('createMessage', `Event created successfully with ID: ${event.id}`, 'success');
-                    document.getElementById('payload').value = '';
-                    loadEvents(); // Refresh the events list
+                    const event = await response.json()
+                    showMessage('createMessage', `Event created with ID #${event.id}`, 'success')
+                    document.getElementById('createForm').reset()
+                    loadEvents()
+                    setTimeout(() => closeDialog('createOverlay'), 1000)
                 } else {
-                    const error = await response.text();
-                    showMessage('createMessage', `Error: ${error}`, 'error');
+                    const error = await response.text()
+                    showMessage('createMessage', `Error: ${error}`, 'error')
                 }
             } catch (error) {
-                showMessage('createMessage', `Error: ${error.message}`, 'error');
+                showMessage('createMessage', `Error: ${error.message}`, 'error')
+            } finally {
+                submit.disabled = false
             }
-        });
+        })
 
-        // Filter button clicks
-        document.querySelectorAll('.filter-btn').forEach(btn => {
+        // ---------- Filters (sidebar) ----------
+        const titleByFilter = {
+            all: 'All events', pending: 'Pending', processing: 'Processing', done: 'Done', failed: 'Failed'
+        }
+        document.querySelectorAll('#filterNav .nav-item').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentFilter = btn.dataset.status;
-                renderEvents();
-            });
-        });
+                document.querySelectorAll('#filterNav .nav-item').forEach(b => b.classList.remove('active'))
+                btn.classList.add('active')
+                currentFilter = btn.dataset.status
+                document.getElementById('eventsTitle').textContent = titleByFilter[currentFilter] || 'Events'
+                renderEvents()
+                closeNav()
+            })
+        })
 
-        // Show message helper
+        // ---------- Message helper ----------
         function showMessage(elementId, text, type) {
-            const messageEl = document.getElementById(elementId);
-            messageEl.textContent = text;
-            messageEl.className = `message ${type} show`;
-            setTimeout(() => {
-                messageEl.classList.remove('show');
-            }, 5000);
+            const el = document.getElementById(elementId)
+            el.textContent = text
+            el.className = `message ${type} show`
+            setTimeout(() => el.classList.remove('show'), 5000)
         }
 
-        // Load all events
+        // ---------- Load events ----------
         async function loadEvents() {
             try {
-                // Fetch all statuses to get complete data
-                const statuses = ['pending', 'processing', 'done', 'failed'];
+                const statuses = ['pending', 'processing', 'done', 'failed']
                 const promises = statuses.map(status =>
-                    fetch(`/api/events?status=${status}`).then(r => r.ok ? r.json() : [])
-                );
-
-                const results = await Promise.all(promises);
-                // Guard against null/malformed responses so one bad status
-                // doesn't break the whole page.
+                    fetch(`/api/events?status=${status}`).then(r => r.ok ? r.json() : []))
+                const results = await Promise.all(promises)
                 allEvents = results
                     .filter(Array.isArray)
                     .flat()
-                    .filter(e => e && typeof e.id === 'number');
-
-                // Sort by ID descending (newest first)
-                allEvents.sort((a, b) => b.id - a.id);
-
-                updateStats();
-                renderEvents();
+                    .filter(e => e && typeof e.id === 'number')
+                allEvents.sort((a, b) => b.id - a.id)
+                updateStats()
+                renderEvents()
             } catch (error) {
-                console.error('Error loading events:', error);
-                document.getElementById('eventsBody').innerHTML = `
-                    <tr>
-                        <td colspan="4" class="empty-state">
-                            <div>Error loading events: ${error.message}</div>
-                        </td>
-                    </tr>
-                `;
+                console.error('Error loading events:', error)
+                document.getElementById('eventsBody').innerHTML =
+                    `<tr><td colspan="6" class="empty-state">Error loading events: ${escapeHtml(error.message)}</td></tr>`
             }
         }
 
-        // Update statistics
+        // ---------- Stats + nav counts ----------
         function updateStats() {
             const stats = {
                 total: allEvents.length,
@@ -458,63 +661,121 @@
                 processing: allEvents.filter(e => e.status === 'processing').length,
                 done: allEvents.filter(e => e.status === 'done').length,
                 failed: allEvents.filter(e => e.status === 'failed').length
-            };
+            }
+            document.getElementById('statTotal').textContent = stats.total
+            document.getElementById('statPending').textContent = stats.pending
+            document.getElementById('statProcessing').textContent = stats.processing
+            document.getElementById('statDone').textContent = stats.done
+            document.getElementById('statFailed').textContent = stats.failed
 
-            document.getElementById('statTotal').textContent = stats.total;
-            document.getElementById('statPending').textContent = stats.pending;
-            document.getElementById('statProcessing').textContent = stats.processing;
-            document.getElementById('statDone').textContent = stats.done;
-            document.getElementById('statFailed').textContent = stats.failed;
+            document.getElementById('navCountAll').textContent = stats.total
+            document.getElementById('navCountPending').textContent = stats.pending
+            document.getElementById('navCountProcessing').textContent = stats.processing
+            document.getElementById('navCountDone').textContent = stats.done
+            document.getElementById('navCountFailed').textContent = stats.failed
         }
 
-        // Render events table
+        // ---------- Render table ----------
+        function statusBadge(status) {
+            const s = String(status || '').toLowerCase()
+            const label = s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Unknown'
+            return `<span class="status-badge status-${s}"><span class="dot"></span>${label}</span>`
+        }
+
         function renderEvents() {
-            const filteredEvents = currentFilter === 'all'
+            const filtered = currentFilter === 'all'
                 ? allEvents
-                : allEvents.filter(e => e.status === currentFilter);
+                : allEvents.filter(e => e.status === currentFilter)
+            const tbody = document.getElementById('eventsBody')
 
-            const tbody = document.getElementById('eventsBody');
-
-            if (filteredEvents.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="empty-state">
-                            <div>No ${currentFilter === 'all' ? '' : currentFilter} events found</div>
-                        </td>
-                    </tr>
-                `;
-                return;
+            if (filtered.length === 0) {
+                const label = currentFilter === 'all' ? '' : currentFilter + ' '
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No ${label}events yet</td></tr>`
+                return
             }
 
-            tbody.innerHTML = filteredEvents.map(event => `
-                <tr>
-                    <td>${event.id}</td>
-                    <td class="payload-cell" title="${escapeHtml(event.payload)}">${escapeHtml(event.payload)}</td>
-                    <td><span class="status-badge status-${event.status}">${event.status}</span></td>
-                    <td>${formatDate(event.created_at)}</td>
+            tbody.innerHTML = filtered.map(event => `
+                <tr class="clickable" data-id="${event.id}">
+                    <td class="cell-id">#${event.id}</td>
+                    <td>${statusBadge(event.status)}</td>
+                    <td class="cell-jobtype">${escapeHtml(event.job_type || '—')}</td>
+                    <td class="cell-truncate" title="${escapeHtml(event.payload || '')}">${escapeHtml(event.payload || '—')}</td>
+                    <td class="cell-truncate" title="${escapeHtml(event.callback_url || '')}">${escapeHtml(event.callback_url || '—')}</td>
+                    <td class="cell-date">${formatDate(event.created_at)}</td>
                 </tr>
-            `).join('');
+            `).join('')
         }
 
-        // Format date
+        // Row click -> delivery history (event delegation survives re-renders)
+        document.getElementById('eventsBody').addEventListener('click', e => {
+            const row = e.target.closest('tr[data-id]')
+            if (row) openExecutions(row.dataset.id)
+        })
+
+        // ---------- Delivery history drill-down ----------
+        function statusCodeClass(code) {
+            if (code == null) return 'code-none'
+            if (code >= 200 && code < 300) return 'code-ok'
+            return 'code-err'
+        }
+
+        async function openExecutions(id) {
+            document.getElementById('execEventId').textContent = '#' + id
+            document.getElementById('execBody').innerHTML = '<div class="empty-state">Loading delivery history…</div>'
+            openDialog('execOverlay')
+            try {
+                const r = await fetch(`/api/executions?event_id=${encodeURIComponent(id)}`)
+                if (!r.ok) throw new Error('HTTP ' + r.status)
+                let data = await r.json()
+                if (!Array.isArray(data)) data = []
+                renderExecutions(data)
+            } catch (error) {
+                document.getElementById('execBody').innerHTML =
+                    `<div class="empty-state">Error loading history: ${escapeHtml(error.message)}</div>`
+            }
+        }
+
+        function renderExecutions(data) {
+            const body = document.getElementById('execBody')
+            if (!data.length) {
+                body.innerHTML = '<div class="empty-state">No delivery attempts yet</div>'
+                return
+            }
+            data.sort((a, b) => new Date(a.attempted_at) - new Date(b.attempted_at))
+            const rows = data.map((x, i) => `
+                <tr>
+                    <td class="cell-id">${i + 1}</td>
+                    <td class="cell-date">${formatDate(x.attempted_at)}</td>
+                    <td class="mono ${statusCodeClass(x.status_code)}" style="font-size:12.5px">${x.status_code == null ? '—' : x.status_code}</td>
+                    <td class="mono" style="font-size:12.5px; color: hsl(var(--muted-foreground))">${x.duration_ms == null ? '—' : x.duration_ms + ' ms'}</td>
+                    <td class="cell-truncate" title="${escapeHtml(x.error || '')}">${x.error ? escapeHtml(x.error) : '—'}</td>
+                </tr>
+            `).join('')
+            body.innerHTML = `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>#</th><th>Attempted At</th><th>Status</th><th>Duration</th><th>Error</th></tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>`
+        }
+
+        // ---------- Helpers ----------
         function formatDate(dateString) {
-            if (!dateString) return 'N/A';
-            const date = new Date(dateString);
-            return date.toLocaleString();
+            if (!dateString) return 'N/A'
+            return new Date(dateString).toLocaleString()
         }
-
-        // Escape HTML to prevent XSS
         function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+            const div = document.createElement('div')
+            div.textContent = text == null ? '' : text
+            return div.innerHTML
         }
 
-        // Auto-refresh every 3 seconds
-        setInterval(loadEvents, 3000);
-
-        // Initial load
-        loadEvents();
+        // ---------- Boot ----------
+        setInterval(loadEvents, 3000)
+        loadEvents()
     </script>
 </body>
 </html>
